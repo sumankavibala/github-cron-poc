@@ -7,7 +7,7 @@ import torch
 
 def get_gold_prices():
     """
-    Scrapes today's 22K and 24K gold rates from Groww or returns fallback values if request fails.
+    Scrapes today's 22K and 24K gold rates from Groww or returns updated fallback values if request fails.
     """
     url = "https://groww.in/gold-rates/gold-rate-today-in-erode"
     headers = {
@@ -15,8 +15,8 @@ def get_gold_prices():
     }
     
     fallback_data = {
-        "22K": "₹6,850 per gram",
-        "24K": "₹7,473 per gram",
+        "22K": "₹13,680.00 per gram",
+        "24K": "₹14,924.00 per gram",
         "source": "fallback"
     }
     
@@ -24,29 +24,30 @@ def get_gold_prices():
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, "html.parser")
-            # Parse pricing information from Groww page structure if available
             tables = soup.find_all("table")
             data_found = {}
+            
             for table in tables:
                 rows = table.find_all("tr")
-                for row in rows:
-                    cols = [ele.text.strip() for ele in row.find_all(["td", "th"])]
-                    if len(cols) >= 2:
-                        header_text = cols[0].lower()
-                        if "22k" in header_text or "22 karat" in header_text:
-                            data_found["22K"] = cols[1]
-                        elif "24k" in header_text or "24 karat" in header_text:
-                            data_found["24K"] = cols[1]
+                if not rows:
+                    continue
+                header_cols = [ele.text.strip().lower() for ele in rows[0].find_all(["td", "th"])]
+                
+                # Check for table structure: ['Gram', '24k', '22k', '18k']
+                if "gram" in header_cols and "24k" in header_cols and "22k" in header_cols:
+                    idx_24k = header_cols.index("24k")
+                    idx_22k = header_cols.index("22k")
+                    
+                    for row in rows[1:]:
+                        cols = [ele.text.strip() for ele in row.find_all(["td", "th"])]
+                        if len(cols) > max(idx_24k, idx_22k) and "1 gram" in cols[0].lower():
+                            data_found["24K"] = cols[idx_24k].split()[0] + " per gram"
+                            data_found["22K"] = cols[idx_22k].split()[0] + " per gram"
+                            break
             
             if "22K" in data_found and "24K" in data_found:
                 data_found["source"] = "live"
                 return data_found
-            
-            # Additional fallback check for general text parsing if table parsing differs
-            text = soup.get_text()
-            if "22K" in text and "24K" in text:
-                # If specific parse didn't lock, log and use structured response or fallback
-                pass
 
     except Exception as e:
         print(f"Error fetching live gold price: {e}", file=sys.stderr)
