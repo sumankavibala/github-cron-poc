@@ -63,8 +63,7 @@ def generate_report(prices):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float32,
-        device_map="cpu"
+        dtype=torch.float32
     )
 
     prompt = (
